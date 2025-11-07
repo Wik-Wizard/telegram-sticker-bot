@@ -6,7 +6,9 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 
 # Get your token from environment variable
-BOT_TOKEN = os.getenv("8295710746:AAEPi7rnN6GwecgtabZXLxqYR_dLef7sXlE")
+import os
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("👋 Send me an image and I’ll add a sticker to the left bottom corner!")
@@ -54,3 +56,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
