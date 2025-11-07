@@ -30,8 +30,8 @@ async def handle_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sticker = sticker.resize((sticker_size, sticker_size))
 
     # Calculate position: left bottom corner
-    x = 1  # 0 px from left
-    y = img.height - sticker.height - 1  # 0 px from bottom
+    x = 0  # 0 px from left
+    y = img.height - sticker.height - 0  # 0 px from bottom
 
     # Paste the sticker (using alpha mask for transparency)
     img.paste(sticker, (x, y), sticker)
@@ -56,4 +56,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
