@@ -10,7 +10,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("👋 Send me an image and I’ll add a sticker tightly to the bottom-left corner!")
+    await update.message.reply_text("Welcome to the MEDITS official Telegram bot. Send me the Image and I'll add the tagline for it")
 
 
 async def handle_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -43,7 +43,7 @@ async def handle_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bio.seek(0)
 
     # Send back modified image
-    await update.message.reply_photo(photo=bio, caption="✨ Sticker added snugly to the bottom-left corner!")
+    await update.message.reply_photo(photo=bio,)
 
 def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
@@ -57,3 +57,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
