@@ -15,27 +15,22 @@ from telegram.ext import (
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-# States for conversation
-WAITING_FOR_TITLE = 1
-
-# Store user photo temporarily
-user_photos = {}
+# Conversation states
+WAITING_FOR_ACTION, WAITING_FOR_TITLE = range(2)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "👋 Send me a photo and I’ll let you add a sticker or a title!"
+        "👋 Welcome! Send me a photo and I’ll let you add a sticker or a title."
     )
 
 async def handle_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
     photo = update.message.photo[-1]
     file = await photo.get_file()
-    file_path = file.file_path
+    response = requests.get(file.file_path)
+    img = Image.open(io.BytesIO(response.download_as_bytearray())).convert("RGBA")
 
-    response = requests.get(file_path)
-    img = Image.open(io.BytesIO(response.content)).convert("RGBA")
-
-    # Save the image temporarily in memory
-    user_photos[update.message.from_user.id] = img
+    # Save image in user_data
+    context.user_data["photo"] = img
 
     # Show inline buttons
     keyboard = [
@@ -46,17 +41,17 @@ async def handle_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("Choose an action:", reply_markup=reply_markup)
+    return WAITING_FOR_ACTION
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    user_id = query.from_user.id
-    if user_id not in user_photos:
+    if "photo" not in context.user_data:
         await query.edit_message_text("Please send a photo first!")
-        return
+        return ConversationHandler.END
 
-    img = user_photos[user_id]
+    img = context.user_data["photo"]
 
     if query.data == "sticker":
         # Sticker overlay process
@@ -75,29 +70,27 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await query.edit_message_text("✨ Sticker added successfully!")
         await query.message.reply_photo(photo=bio)
-        # Remove temp image
-        user_photos.pop(user_id, None)
+        context.user_data.pop("photo", None)
+        return ConversationHandler.END
 
     elif query.data == "title":
         await query.edit_message_text("✏️ Enter your title here:")
         return WAITING_FOR_TITLE
 
 async def add_title(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.message.from_user.id
-    if user_id not in user_photos:
+    if "photo" not in context.user_data:
         await update.message.reply_text("Please send a photo first!")
         return ConversationHandler.END
 
-    img = user_photos[user_id]
+    img = context.user_data["photo"]
     text = update.message.text
-
-    draw = ImageDraw.Draw(img)
     width, height = img.size
+    draw = ImageDraw.Draw(img)
 
-    # Determine max font size to occupy 1/5 of image height
+    # Max font size = 1/5 of image height
     max_text_height = height / 5
     font_size = int(max_text_height)
-    font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"  # system font path
+    font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"  # adjust if needed
     font = ImageFont.truetype(font_path, font_size)
 
     # Reduce font size if text too wide
@@ -107,7 +100,7 @@ async def add_title(update: Update, context: ContextTypes.DEFAULT_TYPE):
         font = ImageFont.truetype(font_path, font_size)
         text_width, text_height = draw.textsize(text, font=font)
 
-    # Create blurred rectangle background
+    # Glass-like blurred background
     padding = 20
     box = [
         (width - text_width) // 2 - padding,
@@ -115,7 +108,6 @@ async def add_title(update: Update, context: ContextTypes.DEFAULT_TYPE):
         (width + text_width) // 2 + padding,
         (height + text_height) // 2 + padding
     ]
-    # Crop region, blur, then paste with alpha
     region = img.crop(box).filter(ImageFilter.GaussianBlur(10))
     img.paste(region, box)
 
@@ -134,7 +126,7 @@ async def add_title(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bio.seek(0)
 
     await update.message.reply_photo(photo=bio, caption="✨ Title added successfully!")
-    user_photos.pop(user_id, None)
+    context.user_data.pop("photo", None)
     return ConversationHandler.END
 
 def main():
@@ -143,6 +135,7 @@ def main():
     conv_handler = ConversationHandler(
         entry_points=[MessageHandler(filters.PHOTO, handle_image)],
         states={
+            WAITING_FOR_ACTION: [CallbackQueryHandler(button_handler)],
             WAITING_FOR_TITLE: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_title)]
         },
         fallbacks=[]
@@ -150,7 +143,6 @@ def main():
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(conv_handler)
-    app.add_handler(CallbackQueryHandler(button_handler))
 
     print("✅ Bot is running...")
     app.run_polling()
